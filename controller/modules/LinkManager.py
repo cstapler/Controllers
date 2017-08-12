@@ -24,6 +24,21 @@ import time
 import json
 import threading
 
+
+def ip_to_int(ip):
+    o = map(int, ip.split('.'))
+    res = (16777216 * o[0]) + (65536 * o[1]) + (256 * o[2]) + o[3]
+    return res
+
+
+def int_to_ip(ipnum):
+    o1 = int(ipnum / 16777216) % 256
+    o2 = int(ipnum / 65536) % 256
+    o3 = int(ipnum / 256) % 256
+    o4 = int(ipnum) % 256
+    return '%(o1)s.%(o2)s.%(o3)s.%(o4)s' % locals()
+
+
 class LinkManager(ControllerModule):
 
     def __init__(self, CFxHandle, paramDict, ModuleName):
@@ -32,6 +47,7 @@ class LinkManager(ControllerModule):
         self.peers_lck = threading.Lock()
         # Member data to hold value for p2plink retries (value entered in config file)
         self.maxretries = self.CMConfig["MaxConnRetry"]
+        self.peer_ipaddr_mapping = self.CMConfig["PeerIpaddrMapping"]
 
     def initialize(self):
         # Query UID and Tap Interface from TincanInterface
@@ -272,6 +288,15 @@ class LinkManager(ControllerModule):
                 msg = cbt.data
                 uid = msg["uid"]
                 msg["data"] = json.loads(msg["data"])
+                # Social VPN feature to build subnet relative to self
+                if self.peer_ipaddr_mapping:
+                    #Discard peer ipdaress and assign new one relative to own
+                    interface_name = msg["interface_name"]
+                    interface_details = self.link_details[interface_name]
+                    base = ip_to_int(interface_details["ipop_state"]['_ip4'])
+                    online_peer_num = len(interface_details["online_peer_uid"])
+                    new_peer_ip = int_to_ip(base + online_peer_num + 1)
+                    msg["data"]["ip4"] = new_peer_ip
                 self.registerCBT('Logger', 'debug', "Received peer {0} req to retrieve CAS details.".format(uid))
                 self.registerCBT('TincanInterface', 'DO_GET_CAS', msg)
                 # Request Peer CAS details for two way connection
@@ -392,7 +417,7 @@ class LinkManager(ControllerModule):
                         # Get P2P Link stats
                         self.registerCBT('TincanInterface', 'DO_QUERY_TUNNEL_STATS', message)
                 self.peers_lck.release()
-                # Check whether Local Node details have been obtained from Tincan, if not issue local 
+                # Check whether Local Node details have been obtained from Tincan, if not issue local
                 # state message to Tincan
                 if "_uid" not in self.link_details[interface_name]["ipop_state"].keys():
                     msg = {"interface_name": interface_name, "MAC": ""}

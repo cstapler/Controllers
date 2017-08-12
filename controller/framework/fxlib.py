@@ -60,6 +60,7 @@ CONFIG = {
         "InitialLinkTTL": 120,              # Initial Time to Live for a p2p link in sec
         "LinkPulse": 180,                   # Time to Live for an online p2p link in sec
         "MaxConnRetry": 5,                  # Max Connection Retry attempts for each p2p link
+        "PeerIpaddrMapping": True,
         "dependencies": ["Logger", "TincanInterface"]
     },
     "BroadcastForwarder": {
